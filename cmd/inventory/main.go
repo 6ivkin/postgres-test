@@ -1,12 +1,12 @@
 package main
 
 import (
-    "log/slog"
-    "net"
-    "net/http"
-    "os"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
 
-    "github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
@@ -17,16 +17,20 @@ func main() {
 		port = "8080"
 	}
 	addr := net.JoinHostPort(host, port)
+	inventory := newInventoryApp(newMemoryStore())
 
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        _, _ = w.Write([]byte("ok"))
-    })
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	r.Post("/parts", inventory.createPart)
+	r.Get("/parts/{id}", inventory.getPart)
+	r.Get("/parts", inventory.listParts)
 
-    slog.Info("inventory service запущен", slog.String("адрес", addr))
-    if err := http.ListenAndServe(addr, r); err != nil {
-        slog.Error("не удалось запустить HTTP-сервер", slog.String("адрес", addr), slog.Any("ошибка", err))
-        os.Exit(1)
-    }
+	slog.Info("inventory service запущен", slog.String("адрес", addr))
+	if err := http.ListenAndServe(addr, r); err != nil {
+		slog.Error("не удалось запустить HTTP-сервер", slog.String("адрес", addr), slog.Any("ошибка", err))
+		os.Exit(1)
+	}
 }
