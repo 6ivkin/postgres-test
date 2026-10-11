@@ -8,16 +8,19 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/go-chi/chi/v5"
 )
 
 type inventoryApp struct {
-	repo *partRepository
+	repo      *partRepository
+	trManager *manager.Manager
 }
 
-func newInventoryApp(repo *partRepository) *inventoryApp {
+func newInventoryApp(repo *partRepository, trManager *manager.Manager) *inventoryApp {
 	return &inventoryApp{
-		repo: repo,
+		repo:      repo,
+		trManager: trManager,
 	}
 }
 

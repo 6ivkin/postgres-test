@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	sq "github.com/Masterminds/squirrel"
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,11 +27,15 @@ const (
 )
 
 type partRepository struct {
-	db *pgxpool.Pool
+	db        *pgxpool.Pool
+	ctxGetter *trmpgx.CtxGetter
 }
 
 func newPartRepository(db *pgxpool.Pool) *partRepository {
-	return &partRepository{db: db}
+	return &partRepository{
+		db:        db,
+		ctxGetter: trmpgx.DefaultCtxGetter,
+	}
 }
 
 func (r *partRepository) Create(ctx context.Context, req CreatePartRequest) (Part, error) {
@@ -52,7 +57,7 @@ func (r *partRepository) Create(ctx context.Context, req CreatePartRequest) (Par
 		Description: req.Description,
 	}
 
-	err = r.db.QueryRow(ctx, query, args...).Scan(
+	err = r.ctxGetter.DefaultTrOrDB(ctx, r.db).QueryRow(ctx, query, args...).Scan(
 		&part.ID,
 		&part.CreatedAt,
 	)
@@ -82,7 +87,7 @@ func (r *partRepository) GetByID(ctx context.Context, id string) (Part, error) {
 	}
 
 	var part Part
-	err = r.db.QueryRow(ctx, query, args...).Scan(
+	err = r.ctxGetter.DefaultTrOrDB(ctx, r.db).QueryRow(ctx, query, args...).Scan(
 		&part.ID,
 		&part.Name,
 		&part.Quantity,
@@ -131,7 +136,7 @@ func (r *partRepository) List(ctx context.Context, params ListPartsParams) ([]Pa
 		return nil, err
 	}
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := r.ctxGetter.DefaultTrOrDB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +167,22 @@ func (r *partRepository) List(ctx context.Context, params ListPartsParams) ([]Pa
 	return parts, nil
 }
 
+func (r *partRepository) LogReserveEvent(ctx context.Context, partID string, qty int32) error {
+	_, err := r.ctxGetter.DefaultTrOrDB(ctx, r.db).Exec(
+		ctx,
+		`INSERT INTO reserve_events (part_id, quantity) VALUES ($1, $2)`,
+		partID,
+		qty,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *partRepository) IncrementReserved(ctx context.Context, id string, qty int32) error {
-	tag, err := r.db.Exec(
+	tag, err := r.ctxGetter.DefaultTrOrDB(ctx, r.db).Exec(
 		ctx,
 		`UPDATE parts SET reserved = reserved + $1 WHERE id = $2`,
 		qty,

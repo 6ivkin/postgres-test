@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
+	trmmanager "github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -41,7 +43,13 @@ func main() {
 
 	repo := newPartRepository(pool)
 
-	inventory := newInventoryApp(repo)
+	trManager, err := trmmanager.New(trmpgx.NewDefaultFactory(pool))
+	if err != nil {
+		slog.Error("не удалось создать менеджер транзакций", slog.Any("ошибка", err))
+		os.Exit(1)
+	}
+
+	inventory := newInventoryApp(repo, trManager)
 
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {

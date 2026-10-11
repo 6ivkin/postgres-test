@@ -15,14 +15,20 @@ func (a *inventoryApp) reservePart(ctx context.Context, id string, qty int32) er
 		return errInvalidReserveRequest
 	}
 
-	part, err := a.repo.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
+	return a.trManager.Do(ctx, func(ctx context.Context) error {
+		part, err := a.repo.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
 
-	if part.AvailableQuantity() < qty {
-		return errInsufficientStock
-	}
+		if part.AvailableQuantity() < qty {
+			return errInsufficientStock
+		}
 
-	return a.repo.IncrementReserved(ctx, id, qty)
+		if err = a.repo.IncrementReserved(ctx, id, qty); err != nil {
+			return err
+		}
+
+		return a.repo.LogReserveEvent(ctx, id, qty)
+	})
 }
