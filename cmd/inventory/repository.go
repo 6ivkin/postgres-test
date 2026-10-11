@@ -69,7 +69,15 @@ func (r *partRepository) Create(ctx context.Context, req CreatePartRequest) (Par
 }
 
 func (r *partRepository) GetByID(ctx context.Context, id string) (Part, error) {
-	query, args, err := psql.
+	return r.getByID(ctx, id, false)
+}
+
+func (r *partRepository) GetByIDForUpdate(ctx context.Context, id string) (Part, error) {
+	return r.getByID(ctx, id, true)
+}
+
+func (r *partRepository) getByID(ctx context.Context, id string, forUpdate bool) (Part, error) {
+	builder := psql.
 		Select(
 			partColumnID,
 			partColumnName,
@@ -80,8 +88,13 @@ func (r *partRepository) GetByID(ctx context.Context, id string) (Part, error) {
 			partColumnCreatedAt,
 		).
 		From(partsTableName).
-		Where(sq.Eq{partColumnID: id}).
-		ToSql()
+		Where(sq.Eq{partColumnID: id})
+
+	if forUpdate {
+		builder = builder.Suffix("FOR UPDATE")
+	}
+
+	query, args, err := builder.ToSql()
 	if err != nil {
 		return Part{}, err
 	}

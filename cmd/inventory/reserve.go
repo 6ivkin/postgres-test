@@ -16,7 +16,7 @@ func (a *inventoryApp) reservePart(ctx context.Context, id string, qty int32) er
 	}
 
 	return a.trManager.Do(ctx, func(ctx context.Context) error {
-		part, err := a.repo.GetByID(ctx, id)
+		part, err := a.repo.GetByIDForUpdate(ctx, id)
 		if err != nil {
 			return err
 		}
