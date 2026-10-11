@@ -161,3 +161,22 @@ func (r *partRepository) List(ctx context.Context, params ListPartsParams) ([]Pa
 
 	return parts, nil
 }
+
+func (r *partRepository) IncrementReserved(ctx context.Context, id string, qty int32) error {
+	tag, err := r.db.Exec(
+		ctx,
+		`UPDATE parts SET reserved = reserved + $1 WHERE id = $2`,
+		qty,
+		id,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if tag.RowsAffected() == 0 {
+		return errPartNotFound
+	}
+
+	return nil
+}

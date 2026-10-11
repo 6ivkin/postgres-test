@@ -39,7 +39,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	inventory := newInventoryApp(newPartRepository(pool))
+	repo := newPartRepository(pool)
+
+	inventory := newInventoryApp(repo)
 
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -49,6 +51,7 @@ func main() {
 	r.Post("/parts", inventory.createPart)
 	r.Get("/parts/{id}", inventory.getPart)
 	r.Get("/parts", inventory.listParts)
+	r.Post("/parts/reserve", inventory.handleReservePart)
 
 	slog.Info("inventory service запущен", slog.String("адрес", addr))
 	if err = http.ListenAndServe(addr, r); err != nil {

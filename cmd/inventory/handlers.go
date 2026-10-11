@@ -77,6 +77,31 @@ func (a *inventoryApp) listParts(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(parts)
 }
 
+func (a *inventoryApp) handleReservePart(w http.ResponseWriter, r *http.Request) {
+	var req ReservePartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "невалидный JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := a.reservePart(r.Context(), req.ID, req.Quantity); err != nil {
+		switch {
+		case errors.Is(err, errPartNotFound):
+			http.Error(w, errPartNotFound.Error(), http.StatusNotFound)
+		case errors.Is(err, errInvalidReserveRequest):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errInsufficientStock):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			slog.Error("не удалось зарезервировать деталь", slog.String("id", req.ID), slog.Any("ошибка", err))
+			http.Error(w, "не удалось зарезервировать деталь", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func readListPartsParams(r *http.Request) (ListPartsParams, error) {
 	q := r.URL.Query()
 	params := ListPartsParams{

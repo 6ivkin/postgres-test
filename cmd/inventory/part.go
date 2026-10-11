@@ -19,9 +19,18 @@ type CreatePartRequest struct {
 	Description *string `json:"description"`
 }
 
+type ReservePartRequest struct {
+	ID       string `json:"id"`
+	Quantity int32  `json:"quantity"`
+}
+
 type ListPartsParams struct {
 	Name     string
 	MinPrice *int64
 	Limit    uint64
 	Offset   uint64
+}
+
+func (p Part) AvailableQuantity() int32 {
+	return p.Quantity - p.Reserved
 }
