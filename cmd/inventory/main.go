@@ -1,23 +1,45 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
 	host := os.Getenv("APP_HOST")
 	port := os.Getenv("APP_PORT")
+	dsn := os.Getenv("PG_DSN")
 
 	if port == "" {
 		port = "8080"
 	}
+	if dsn == "" {
+		slog.Error("переменная окружения PG_DSN обязательна")
+		os.Exit(1)
+	}
+
 	addr := net.JoinHostPort(host, port)
-	inventory := newInventoryApp(newMemoryStore())
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		slog.Error("не удалось создать пул подключений к PostgreSQL", slog.Any("ошибка", err))
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	if err = pool.Ping(ctx); err != nil {
+		slog.Error("не удалось проверить подключение к PostgreSQL", slog.Any("ошибка", err))
+		os.Exit(1)
+	}
+
+	inventory := newInventoryApp(newPartRepository(pool))
 
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -29,7 +51,7 @@ func main() {
 	r.Get("/parts", inventory.listParts)
 
 	slog.Info("inventory service запущен", slog.String("адрес", addr))
-	if err := http.ListenAndServe(addr, r); err != nil {
+	if err = http.ListenAndServe(addr, r); err != nil {
 		slog.Error("не удалось запустить HTTP-сервер", slog.String("адрес", addr), slog.Any("ошибка", err))
 		os.Exit(1)
 	}
