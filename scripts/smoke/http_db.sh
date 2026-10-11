@@ -2,7 +2,11 @@
 set -euo pipefail
 
 BASE_URL="http://localhost:8080"
-PG="docker compose exec -T pg psql -U user -d orders"
+pg() {
+    docker exec -i postgres sh -c \
+        'exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres_test "$@"' \
+        sh "$@"
+}
 
 # ─── Colors ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -44,9 +48,11 @@ request() {
 }
 
 db_query() {
-  local sql="$1"
-  echo -e "  ${DIM}psql: ${sql}${RESET}" >&2
-  $PG -t -c "$sql" 2>/dev/null | tr -d ' '
+    local sql="$1"
+
+    echo -e "  ${DIM}psql: ${sql}${RESET}" >&2
+
+    pg -At -c "$sql" | tr -d '[:space:]'
 }
 
 print_json() {
@@ -70,7 +76,7 @@ summary() {
 # ─── Подготовка БД ────────────────────────────────────────────────────────────
 section "Подготовка — сброс таблицы parts"
 echo -e "  ${DIM}TRUNCATE parts${RESET}"
-$PG -c "TRUNCATE parts;" >/dev/null
+pg -c "TRUNCATE TABLE parts;" >/dev/null
 check "таблица очищена" "[ \"$(db_query 'SELECT COUNT(*) FROM parts;')\" = '0' ]"
 
 # ─── Health Check ─────────────────────────────────────────────────────────────

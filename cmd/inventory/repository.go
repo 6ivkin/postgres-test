@@ -21,6 +21,7 @@ const (
 	partColumnQuantity  = "quantity"
 	partColumnPrice     = "price"
 	partColumnReserved  = "reserved"
+	partColumnDesc      = "description"
 	partColumnCreatedAt = "created_at"
 )
 
@@ -35,8 +36,8 @@ func newPartRepository(db *pgxpool.Pool) *partRepository {
 func (r *partRepository) Create(ctx context.Context, req CreatePartRequest) (Part, error) {
 	query, args, err := psql.
 		Insert(partsTableName).
-		Columns(partColumnName, partColumnQuantity, partColumnPrice, partColumnReserved).
-		Values(req.Name, req.Quantity, req.Price, 0).
+		Columns(partColumnName, partColumnQuantity, partColumnPrice, partColumnReserved, partColumnDesc).
+		Values(req.Name, req.Quantity, req.Price, 0, req.Description).
 		Suffix("RETURNING " + partColumnID + ", " + partColumnCreatedAt).
 		ToSql()
 	if err != nil {
@@ -44,10 +45,11 @@ func (r *partRepository) Create(ctx context.Context, req CreatePartRequest) (Par
 	}
 
 	part := Part{
-		Name:     req.Name,
-		Quantity: req.Quantity,
-		Price:    req.Price,
-		Reserved: 0,
+		Name:        req.Name,
+		Quantity:    req.Quantity,
+		Price:       req.Price,
+		Reserved:    0,
+		Description: req.Description,
 	}
 
 	err = r.db.QueryRow(ctx, query, args...).Scan(
@@ -69,6 +71,7 @@ func (r *partRepository) GetByID(ctx context.Context, id string) (Part, error) {
 			partColumnQuantity,
 			partColumnPrice,
 			partColumnReserved,
+			partColumnDesc,
 			partColumnCreatedAt,
 		).
 		From(partsTableName).
@@ -85,6 +88,7 @@ func (r *partRepository) GetByID(ctx context.Context, id string) (Part, error) {
 		&part.Quantity,
 		&part.Price,
 		&part.Reserved,
+		&part.Description,
 		&part.CreatedAt,
 	)
 	if err != nil {
@@ -98,19 +102,31 @@ func (r *partRepository) GetByID(ctx context.Context, id string) (Part, error) {
 	return part, nil
 }
 
-func (r *partRepository) List(ctx context.Context) ([]Part, error) {
-	query, args, err := psql.
+func (r *partRepository) List(ctx context.Context, params ListPartsParams) ([]Part, error) {
+	builder := psql.
 		Select(
 			partColumnID,
 			partColumnName,
 			partColumnQuantity,
 			partColumnPrice,
 			partColumnReserved,
+			partColumnDesc,
 			partColumnCreatedAt,
 		).
 		From(partsTableName).
 		OrderBy(partColumnID + " ASC").
-		ToSql()
+		Limit(params.Limit).
+		Offset(params.Offset)
+
+	if params.Name != "" {
+		builder = builder.Where(sq.Eq{partColumnName: params.Name})
+	}
+
+	if params.MinPrice != nil {
+		builder = builder.Where(sq.GtOrEq{partColumnPrice: *params.MinPrice})
+	}
+
+	query, args, err := builder.ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +146,7 @@ func (r *partRepository) List(ctx context.Context) ([]Part, error) {
 			&part.Quantity,
 			&part.Price,
 			&part.Reserved,
+			&part.Description,
 			&part.CreatedAt,
 		); err != nil {
 			return nil, err

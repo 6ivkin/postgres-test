@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -58,7 +60,13 @@ func (a *inventoryApp) getPart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *inventoryApp) listParts(w http.ResponseWriter, r *http.Request) {
-	parts, err := a.repo.List(r.Context())
+	params, err := readListPartsParams(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	parts, err := a.repo.List(r.Context(), params)
 	if err != nil {
 		slog.Error("не удалось получить список деталей", slog.Any("ошибка", err))
 		http.Error(w, "не удалось получить список деталей", http.StatusInternalServerError)
@@ -67,4 +75,39 @@ func (a *inventoryApp) listParts(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(parts)
+}
+
+func readListPartsParams(r *http.Request) (ListPartsParams, error) {
+	q := r.URL.Query()
+	params := ListPartsParams{
+		Name:   q.Get("name"),
+		Limit:  10,
+		Offset: 0,
+	}
+
+	if v := q.Get("min_price"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return ListPartsParams{}, fmt.Errorf("невалидный min_price")
+		}
+		params.MinPrice = &parsed
+	}
+
+	if v := q.Get("limit"); v != "" {
+		parsed, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return ListPartsParams{}, fmt.Errorf("невалидный limit")
+		}
+		params.Limit = parsed
+	}
+
+	if v := q.Get("offset"); v != "" {
+		parsed, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return ListPartsParams{}, fmt.Errorf("невалидный offset")
+		}
+		params.Offset = parsed
+	}
+
+	return params, nil
 }

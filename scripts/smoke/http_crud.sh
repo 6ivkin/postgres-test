@@ -126,7 +126,7 @@ echo -e "  Ответ:"; print_json "$LIST"
 check "список содержит engine"           "echo '$LIST' | grep '\"name\":\"engine\"'"
 check "список содержит gearbox"          "echo '$LIST' | grep '\"name\":\"gearbox\"'"
 check "список содержит wheel"            "echo '$LIST' | grep '\"name\":\"wheel\"'"
-check "в списке не менее 3 элементов"    "echo '$LIST' | python3 -c \"import sys,json; d=json.load(sys.stdin); exit(0 if len(d)>=3 else 1)\""
+check "в списке не менее 3 элементов"    "echo '$LIST' | python3 -c \"import sys,json; d=json.load(sys.stdin); exit(0 if d and len(d)>=3 else 1)\""
 
 # ─── Validation: bad JSON ─────────────────────────────────────────────────────
 section "POST /parts — невалидный запрос"
